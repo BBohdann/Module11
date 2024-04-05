@@ -21,32 +21,17 @@ import java.util.Map;
 @WebServlet(value = "/time")
 public class TimeServlet extends HttpServlet {
     private TemplateEngine engine;
+
     @Override
     public void init() throws ServletException {
-        engine = new TemplateEngine();
-        JakartaServletWebApplication jswa =
-                JakartaServletWebApplication.buildApplication(this.getServletContext());
-        WebApplicationTemplateResolver resolver = new WebApplicationTemplateResolver(jswa);
-        resolver.setPrefix("/templates/");
-        resolver.setSuffix(".html");
-        resolver.setTemplateMode("HTML5");
-        resolver.setOrder(engine.getTemplateResolvers().size());
-        resolver.setCacheable(false);
-        engine.addTemplateResolver(resolver);
+        engine = TemplateImpl.initialize(getServletContext());
     }
 
     @Override
     public void doGet(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
         String timezone = req.getParameter("timezone");
-        if (isCookie(req)) {
-            Cookie[] cookies = req.getCookies();
-                for (Cookie cookie : cookies) {
-                    String cookieName = cookie.getName();
-                    String cookieValue = cookie.getValue();
-                    if (cookieName.equals("lastTimezone")) {
-                        timezone = cookieValue;
-                }
-            }
+        if (hasCookie(req, "lastTimezone")) {
+            timezone = getCookieValue(req, "lastTimezone");
         }
 
         ZonedDateTime currentTime = null;
@@ -54,8 +39,7 @@ public class TimeServlet extends HttpServlet {
             if (timezone.startsWith("UTC")) {
                 int hours = Integer.parseInt(timezone.trim().substring(4));
                 currentTime = ZonedDateTime.now(ZoneId.ofOffset("UTC", ZoneOffset.ofHours(hours)));
-                Cookie cookie = new Cookie("lastTimezone", timezone.replace(" ", "+"));
-                resp.addCookie(cookie);
+                addCookie(resp, "lastTimezone", timezone.replace(" ", "+"));
             }
         } else {
             currentTime = ZonedDateTime.now(ZoneId.of("UTC"));
@@ -66,15 +50,36 @@ public class TimeServlet extends HttpServlet {
         String formattedTime = currentTime.format(formatter);
 
         Context info = new Context(req.getLocale(), Map.of("time", formattedTime, "timezone", timezone));
-        engine.process("time", info , resp.getWriter());
+        engine.process("time", info, resp.getWriter());
         resp.getWriter().close();
     }
 
-    public boolean isCookie(HttpServletRequest req){
-        boolean flag = true;
-        if(req.getCookies() == null){
-            flag = false;
+    private boolean hasCookie(HttpServletRequest req, String cookieName) {
+        Cookie[] cookies = req.getCookies();
+        if (cookies != null) {
+            for (Cookie cookie : cookies) {
+                if (cookie.getName().equals(cookieName)) {
+                    return true;
+                }
+            }
         }
-        return flag;
+        return false;
+    }
+
+    private String getCookieValue(HttpServletRequest req, String cookieName) {
+        Cookie[] cookies = req.getCookies();
+        if (cookies != null) {
+            for (Cookie cookie : cookies) {
+                if (cookie.getName().equals(cookieName)) {
+                    return cookie.getValue();
+                }
+            }
+        }
+        return null;
+    }
+
+    private void addCookie(HttpServletResponse resp, String name, String value) {
+        Cookie cookie = new Cookie(name, value);
+        resp.addCookie(cookie);
     }
 }

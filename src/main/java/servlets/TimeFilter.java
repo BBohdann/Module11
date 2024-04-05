@@ -18,16 +18,7 @@ public class TimeFilter extends HttpFilter {
     private TemplateEngine engine;
     @Override
     public void init() throws ServletException {
-        engine = new TemplateEngine();
-        JakartaServletWebApplication jswa =
-                JakartaServletWebApplication.buildApplication(this.getServletContext());
-        WebApplicationTemplateResolver resolver = new WebApplicationTemplateResolver(jswa);
-        resolver.setPrefix("/templates/");
-        resolver.setSuffix(".html");
-        resolver.setTemplateMode("HTML5");
-        resolver.setOrder(engine.getTemplateResolvers().size());
-        resolver.setCacheable(false);
-        engine.addTemplateResolver(resolver);
+        engine = TemplateImpl.initialize(getServletContext());
     }
     @Override
     public void doFilter(HttpServletRequest req, HttpServletResponse res, FilterChain chain) throws IOException, ServletException {
@@ -41,8 +32,11 @@ public class TimeFilter extends HttpFilter {
             chain.doFilter(req, res);
     }
     private boolean isValidZone(String timezone) {
-        timezone = timezone.trim().substring(4);
-        int offsetHours = Integer.parseInt(timezone);
-        return offsetHours >= -18 && offsetHours <= 18;
+        try {
+            int offsetHours = Integer.parseInt(timezone.trim().substring(4));
+            return offsetHours >= -18 && offsetHours <= 18;
+        } catch (NumberFormatException | StringIndexOutOfBoundsException e) {
+            return false;
+        }
     }
 }
